@@ -12,7 +12,7 @@ metadata:
   name: dummy-editor-role
 rules:
 - apiGroups:
-  - homework.interview.com
+  - homework.interview.me
   resources:
   - dummies
   verbs:
@@ -24,7 +24,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - homework.interview.com
+  - homework.interview.me
   resources:
   - dummies/status
   verbs:

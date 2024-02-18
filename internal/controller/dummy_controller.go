@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,23 +34,36 @@ type DummyReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=homework.interview.com,resources=dummies,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=homework.interview.com,resources=dummies/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=homework.interview.com,resources=dummies/finalizers,verbs=update
+//+kubebuilder:rbac:groups=homework.interview.me,resources=dummies,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=homework.interview.me,resources=dummies/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=homework.interview.me,resources=dummies/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Dummy object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func (r *DummyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	reqLogger := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	reqLogger.V(6).Info("Reconciling Dummy object")
+
+	dummy := new(homeworkv1alpha1.Dummy)
+
+	err := r.Get(ctx, req.NamespacedName, dummy)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.V(8).Info("Dummy object not found.")
+
+			return ctrl.Result{}, nil
+		}
+
+		reqLogger.Error(err, "Failed to get Dummy object")
+
+		return ctrl.Result{}, err
+	}
+
+	reqLogger.Info("Dummy object", "Message", dummy.Spec.Message)
 
 	return ctrl.Result{}, nil
 }

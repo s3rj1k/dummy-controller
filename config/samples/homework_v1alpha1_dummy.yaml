@@ -1,4 +1,4 @@
-apiVersion: homework.interview.com/v1alpha1
+apiVersion: homework.interview.me/v1alpha1
 kind: Dummy
 metadata:
   labels:
