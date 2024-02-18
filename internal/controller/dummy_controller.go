@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,6 +28,8 @@ import (
 
 	homeworkv1alpha1 "github.com/s3rj1k/dummy-controller/api/v1alpha1"
 )
+
+const TimeToRequeueOnSuccess = 5 * time.Minute
 
 // DummyReconciler reconciles a Dummy object
 type DummyReconciler struct {
@@ -65,7 +68,20 @@ func (r *DummyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	reqLogger.Info("Dummy object", "Message", dummy.Spec.Message)
 
-	return ctrl.Result{}, nil
+	if dummy.Status.SpecEcho == dummy.Spec.Message {
+		return ctrl.Result{RequeueAfter: TimeToRequeueOnSuccess}, nil
+	}
+
+	dummy.Status.SpecEcho = dummy.Spec.Message
+
+	err = r.Status().Update(ctx, dummy)
+	if err != nil {
+		reqLogger.Error(err, "Failed to update Dummy object status")
+
+		return ctrl.Result{}, err
+	}
+
+	return ctrl.Result{RequeueAfter: TimeToRequeueOnSuccess}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -21,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -31,54 +30,73 @@ import (
 )
 
 var _ = Describe("Dummy Controller", func() {
-	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
-
+	Context("when reconciling a resource", func() {
 		ctx := context.Background()
 
 		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Name:      "test-resource",
+			Namespace: metav1.NamespaceDefault,
 		}
-		dummy := &homeworkv1alpha1.Dummy{}
-
-		BeforeEach(func() {
-			By("creating the custom resource for the Kind Dummy")
-			err := k8sClient.Get(ctx, typeNamespacedName, dummy)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &homeworkv1alpha1.Dummy{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
-					},
-					// TODO(user): Specify other spec details if needed.
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
-			}
-		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &homeworkv1alpha1.Dummy{}
+			resource := new(homeworkv1alpha1.Dummy)
+
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
+			if err == nil {
+				By("cleanup the specific resource instance Dummy")
 
-			By("Cleanup the specific resource instance Dummy")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-		})
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &DummyReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 			}
-
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
 		})
+
+		DescribeTable("should reconcile resources based on spec values",
+			func(message string, expectedMessage string, invalidStatus bool) {
+				By("creating a resource with a specific message in spec")
+
+				resource := &homeworkv1alpha1.Dummy{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      typeNamespacedName.Name,
+						Namespace: typeNamespacedName.Namespace,
+					},
+					Spec: homeworkv1alpha1.DummySpec{
+						Message: message,
+					},
+				}
+
+				err := k8sClient.Create(ctx, resource)
+				Expect(err).NotTo(HaveOccurred())
+
+				By("reconciling the created resource")
+
+				controllerReconciler := &DummyReconciler{
+					Client: k8sClient,
+					Scheme: k8sClient.Scheme(),
+				}
+
+				_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: typeNamespacedName,
+				})
+				Expect(err).NotTo(HaveOccurred())
+
+				By("fetching the reconciled resource to check its status")
+
+				reconciledResource := new(homeworkv1alpha1.Dummy)
+
+				Expect(k8sClient.Get(ctx, typeNamespacedName, reconciledResource)).To(Succeed())
+				if invalidStatus {
+					Expect(reconciledResource.Status.SpecEcho).NotTo(Equal(expectedMessage))
+				} else {
+					Expect(reconciledResource.Status.SpecEcho).To(Equal(expectedMessage))
+				}
+
+				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			},
+
+			Entry("Valid status: strings should be equal", "foo", "foo", false),
+			Entry("Valid status: strings should be equal", "bar", "bar", false),
+			Entry("Valid status: empty string", "", "", false),
+			Entry("Invalid status: no status when expected", "", "bar", true),
+			Entry("Invalid status: status set when not expected", "bar", "", true),
+		)
 	})
 })
