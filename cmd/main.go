@@ -74,6 +74,10 @@ func main() {
 	flag.DurationVar(&config.TimeToRequeueOnSuccess, "time-to-requeue", controller.TimeToRequeueOnSuccess,
 		"The time duration to wait before requeuing on success (e.g., '300ms', '1.5h', '2h45m').",
 	)
+	flag.StringVar(&config.PodContainerName, "pod-container-name", controller.PodContainerName,
+		"The name of container in bound Pod.")
+	flag.StringVar(&config.PodContainerImage, "pod-container-image", controller.PodContainerImage,
+		"The container image of bound Pod.")
 
 	opts := zap.Options{
 		Development: true,
