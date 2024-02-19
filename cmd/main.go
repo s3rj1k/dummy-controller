@@ -52,11 +52,16 @@ func init() {
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	var secureMetrics bool
-	var enableHTTP2 bool
+	var (
+		metricsAddr          string
+		enableLeaderElection bool
+		probeAddr            string
+		secureMetrics        bool
+		enableHTTP2          bool
+
+		config controller.DummyControllerConfig
+	)
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -66,10 +71,15 @@ func main() {
 		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.DurationVar(&config.TimeToRequeueOnSuccess, "time-to-requeue", controller.TimeToRequeueOnSuccess,
+		"The time duration to wait before requeuing on success (e.g., '300ms', '1.5h', '2h45m').",
+	)
+
 	opts := zap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
+
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
@@ -125,6 +135,7 @@ func main() {
 	if err = (&controller.DummyReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Config: config,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Dummy")
 		os.Exit(1)

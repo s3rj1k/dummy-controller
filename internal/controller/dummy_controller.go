@@ -31,10 +31,16 @@ import (
 
 const TimeToRequeueOnSuccess = 5 * time.Minute
 
+// DummyControllerConfig contains additional config options for controller
+type DummyControllerConfig struct {
+	TimeToRequeueOnSuccess time.Duration
+}
+
 // DummyReconciler reconciles a Dummy object
 type DummyReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Config DummyControllerConfig
 }
 
 //+kubebuilder:rbac:groups=homework.interview.me,resources=dummies,verbs=get;list;watch;create;update;patch;delete
@@ -69,7 +75,7 @@ func (r *DummyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	reqLogger.Info("Dummy object", "Message", dummy.Spec.Message)
 
 	if dummy.Status.SpecEcho == dummy.Spec.Message {
-		return ctrl.Result{RequeueAfter: TimeToRequeueOnSuccess}, nil
+		return ctrl.Result{RequeueAfter: r.Config.TimeToRequeueOnSuccess}, nil
 	}
 
 	dummy.Status.SpecEcho = dummy.Spec.Message
@@ -81,7 +87,7 @@ func (r *DummyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{RequeueAfter: TimeToRequeueOnSuccess}, nil
+	return ctrl.Result{RequeueAfter: r.Config.TimeToRequeueOnSuccess}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
