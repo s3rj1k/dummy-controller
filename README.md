@@ -1,16 +1,20 @@
 # dummy-controller
-// TODO(user): Add simple overview of use/purpose
+Demo Dummy-controller project built with Operator SDK v1.33.0 (using Golang v1.21)
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+Controller reconciles `apiVersion: homework.interview.me/v1alpha1` resources of
+`kind: Dummy`, for each `Dummy` resource:
+- controller updates `status.specEcho` with value from `spec.message`;
+- ensures existance of bound `Pod` object, setting proper `OwnerReference`;
+- updates `status.podStatus` with data from `Pod` `status.phase`.
 
 ## Getting Started
 
 ### Prerequisites
 - go version v1.21+
 - docker version 24.0.0+.
-- kubectl version v1.28+.
-- Access to a Kubernetes v1.28+ cluster.
+- kubectl version v1.19.2+.
+- Access to a Kubernetes v1.19.2+ cluster.
 
 ### To Deploy on the cluster
 **Build and push your image to the location specified by `IMG`:**
@@ -67,7 +71,7 @@ make undeploy
 ```
 
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+No contribution posssible, demo project.
 
 **NOTE:** Run `make help` for more information on all potential `make` targets
 

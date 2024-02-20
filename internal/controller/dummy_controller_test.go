@@ -131,6 +131,5 @@ var _ = Describe("Dummy Controller", Ordered, func() {
 			}
 			return false
 		}, "1m", "10s").Should(BeTrue(), "Dummy resource should be deleted or in terminating state within the timeout period")
-
 	})
 })
