@@ -39,6 +39,8 @@ import (
 const (
 	TimeToRequeueOnSuccess = 5 * time.Minute
 
+	PodLabelKey = "homework.interview.me/pod"
+
 	PodContainerName  = "dummy-object-bound-container"
 	PodContainerImage = "nginx:latest"
 )
@@ -138,7 +140,7 @@ func (r *DummyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			Name:      r.getBoundPodName(dummy.ObjectMeta),
 			Namespace: req.Namespace,
 			Labels: map[string]string{
-				"homework.interview.me/pod": req.Name,
+				PodLabelKey: req.Name,
 			},
 		},
 	}

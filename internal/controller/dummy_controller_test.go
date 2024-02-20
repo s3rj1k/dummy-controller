@@ -21,7 +21,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,74 +32,105 @@ import (
 	homeworkv1alpha1 "github.com/s3rj1k/dummy-controller/api/v1alpha1"
 )
 
-var _ = Describe("Dummy Controller", func() {
-	Context("when reconciling a resource", func() {
-		ctx := context.Background()
+var _ = Describe("Dummy Controller", Ordered, func() {
+	ctx := context.Background()
 
-		typeNamespacedName := types.NamespacedName{
-			Name:      "test-resource",
-			Namespace: metav1.NamespaceDefault,
+	resourceTypeNamespacedName := types.NamespacedName{
+		Name:      "test-dummy",
+		Namespace: metav1.NamespaceDefault,
+	}
+
+	BeforeEach(func() {
+		// Setup code if needed
+	})
+
+	DescribeTable("Should reconcile resources based on spec values",
+		func(message string, expectedMessage string, invalidStatus bool) {
+			By("Creating a resource with a specific message in spec")
+			resource := &homeworkv1alpha1.Dummy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resourceTypeNamespacedName.Name,
+					Namespace: resourceTypeNamespacedName.Namespace,
+				},
+				Spec: homeworkv1alpha1.DummySpec{
+					Message: message,
+				},
+			}
+			err := k8sClient.Create(ctx, resource)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Reconciling the created resource")
+			r := &DummyReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+				Config: DummyControllerConfig{
+					PodContainerName:  PodContainerName,
+					PodContainerImage: "google/pause:latest",
+				},
+			}
+			_, err = r.Reconcile(ctx, reconcile.Request{
+				NamespacedName: resourceTypeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Fetching the reconciled resource to check its status")
+			reconciledResource := new(homeworkv1alpha1.Dummy)
+			Expect(k8sClient.Get(ctx, resourceTypeNamespacedName, reconciledResource)).To(Succeed())
+			if invalidStatus {
+				Expect(reconciledResource.Status.SpecEcho).NotTo(Equal(expectedMessage))
+			} else {
+				Expect(reconciledResource.Status.SpecEcho).To(Equal(expectedMessage))
+			}
+
+			By("Checking for the presence of a Pod after reconcile")
+			pod := &corev1.Pod{}
+			err = k8sClient.Get(ctx, types.NamespacedName{
+				Name:      r.getBoundPodName(resource.ObjectMeta),
+				Namespace: metav1.NamespaceDefault,
+			}, pod)
+			Expect(err).NotTo(HaveOccurred(), "Pod should exist after reconcile")
+		},
+
+		Entry("Valid status: strings should be equal", "foo", "foo", false),
+		Entry("Valid status: strings should be equal", "bar", "bar", false),
+		Entry("Valid status: empty string", "", "", false),
+		Entry("Invalid status: no status when expected", "", "bar", true),
+		Entry("Invalid status: status set when not expected", "bar", "", true),
+	)
+
+	AfterEach(func() {
+		resource := new(homeworkv1alpha1.Dummy)
+
+		err := k8sClient.Get(ctx, resourceTypeNamespacedName, resource)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return
+			} else {
+				Expect(err).NotTo(HaveOccurred(), "Unexpected error when retrieving the resource")
+			}
 		}
 
-		AfterEach(func() {
-			resource := new(homeworkv1alpha1.Dummy)
+		By("Cleanup the specific resource instance Dummy")
+		Expect(k8sClient.Delete(ctx, resource, []client.DeleteOption{
+			client.PropagationPolicy(metav1.DeletePropagationBackground),
+		}...)).To(Succeed())
 
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			if err == nil {
-				By("cleanup the specific resource instance Dummy")
+		By("Waiting for Dummy resource to be deleted")
+		Eventually(func() bool {
+			pod := new(corev1.Pod)
 
-				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			err := k8sClient.Get(ctx, resourceTypeNamespacedName, pod)
+			if errors.IsNotFound(err) {
+				return true
+			} else if err != nil {
+				return false
+			} else {
+				if pod.ObjectMeta.DeletionTimestamp != nil {
+					return true
+				}
 			}
-		})
+			return false
+		}, "1m", "10s").Should(BeTrue(), "Dummy resource should be deleted or in terminating state within the timeout period")
 
-		DescribeTable("should reconcile resources based on spec values",
-			func(message string, expectedMessage string, invalidStatus bool) {
-				By("creating a resource with a specific message in spec")
-
-				resource := &homeworkv1alpha1.Dummy{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      typeNamespacedName.Name,
-						Namespace: typeNamespacedName.Namespace,
-					},
-					Spec: homeworkv1alpha1.DummySpec{
-						Message: message,
-					},
-				}
-
-				err := k8sClient.Create(ctx, resource)
-				Expect(err).NotTo(HaveOccurred())
-
-				By("reconciling the created resource")
-
-				controllerReconciler := &DummyReconciler{
-					Client: k8sClient,
-					Scheme: k8sClient.Scheme(),
-				}
-
-				_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-					NamespacedName: typeNamespacedName,
-				})
-				Expect(err).NotTo(HaveOccurred())
-
-				By("fetching the reconciled resource to check its status")
-
-				reconciledResource := new(homeworkv1alpha1.Dummy)
-
-				Expect(k8sClient.Get(ctx, typeNamespacedName, reconciledResource)).To(Succeed())
-				if invalidStatus {
-					Expect(reconciledResource.Status.SpecEcho).NotTo(Equal(expectedMessage))
-				} else {
-					Expect(reconciledResource.Status.SpecEcho).To(Equal(expectedMessage))
-				}
-
-				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-			},
-
-			Entry("Valid status: strings should be equal", "foo", "foo", false),
-			Entry("Valid status: strings should be equal", "bar", "bar", false),
-			Entry("Valid status: empty string", "", "", false),
-			Entry("Invalid status: no status when expected", "", "bar", true),
-			Entry("Invalid status: status set when not expected", "bar", "", true),
-		)
 	})
 })
